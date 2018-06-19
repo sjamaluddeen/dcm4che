@@ -48,6 +48,7 @@ import java.awt.image.SampleModel;
 import java.awt.image.WritableRaster;
 import java.io.ByteArrayInputStream;
 import java.io.Closeable;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -79,6 +80,7 @@ import org.dcm4che3.image.LookupTableFactory;
 import org.dcm4che3.image.Overlays;
 import org.dcm4che3.image.PhotometricInterpretation;
 import org.dcm4che3.image.StoredValue;
+import org.dcm4che3.imageio.codec.ImageDescriptor;
 import org.dcm4che3.imageio.codec.ImageReaderFactory;
 import org.dcm4che3.imageio.codec.ImageReaderFactory.ImageReaderParam;
 import org.dcm4che3.imageio.codec.jpeg.PatchJPEGLS;
@@ -184,7 +186,8 @@ public class DicomImageReader extends ImageReader implements CloneIt<DicomImageR
     private int frameLength;
 
     private PhotometricInterpretation pmi;
-    
+    private ImageDescriptor imageDescriptor;
+
     public DicomImageReader(ImageReaderSpi originatingProvider) {
         super(originatingProvider);
     }
@@ -694,10 +697,15 @@ public class DicomImageReader extends ImageReader implements CloneIt<DicomImageR
             Attributes fmi = dis.readFileMetaInformation();
             Attributes ds = dis.readDataset(-1, Tag.PixelData);
             if (dis.tag() == Tag.PixelData) {
+                imageDescriptor = new ImageDescriptor(ds);
                 pixelDataVR = dis.vr();
                 pixelDataLength = dis.length();
                 if (pixelDataLength == -1)
-                    epdiis = new EncapsulatedPixelDataImageInputStream(dis, ds.getInt(Tag.NumberOfFrames, 1));
+                    epdiis = new EncapsulatedPixelDataImageInputStream(dis, imageDescriptor);
+            } else {
+                try {
+                    dis.readAttributes(ds, -1, -1);
+                } catch (EOFException e) {};
             }
             setMetadata(new DicomMetaData(fmi, ds));
             return;

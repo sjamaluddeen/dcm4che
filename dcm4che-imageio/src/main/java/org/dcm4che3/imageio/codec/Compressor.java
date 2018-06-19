@@ -102,10 +102,11 @@ public class Compressor implements Closeable {
     private ImageParams imageParams;
     private Decompressor decompressor = null;
     private BufferedImage uncompressedImage;
+    private Property[] compressParams;
 
     private ImageReadParam verifyParam;
 
-    public Compressor(Attributes dataset, String tsuid, String compressTsuid, Property... compressParams) {
+    public Compressor(Attributes dataset, String tsuid, String compressTsuid,Property... params) {
         if (compressTsuid == null)
             throw new NullPointerException("compressTsuid");
 
@@ -113,6 +114,7 @@ public class Compressor implements Closeable {
         this.imageParams = new ImageParams(dataset);
         this.tsType = TransferSyntaxType.forUID(tsuid);
         this.compressTsuid = compressTsuid;
+        this.compressParams = params;
 
         pixels = dataset.getValue(Tag.PixelData, pixeldataVR);
         if (pixels == null)
@@ -133,6 +135,16 @@ public class Compressor implements Closeable {
             this.decompressor = new Decompressor(dataset, tsuid);
 
         embeddedOverlays = Overlays.getEmbeddedOverlayGroupOffsets(dataset);
+    }
+
+    public boolean compress()
+            throws IOException {
+
+        if (pixels == null)
+            return false;
+
+        if(imageParams.getFrames() == 0)
+            return false;
 
         ImageWriterFactory.ImageWriterParam param =
                 ImageWriterFactory.getImageWriterParam(compressTsuid);
@@ -174,12 +186,8 @@ public class Compressor implements Closeable {
             this.verifyParam = verifier.getDefaultReadParam();
             LOG.debug("Verifier: {}", verifier.getClass().getName());
         }
-    }
 
-    public boolean compress() throws IOException {
 
-        if (pixels == null)
-            return false;
 
         TransferSyntaxType compressTsType = TransferSyntaxType.forUID(compressTsuid);
         if (decompressor == null || tsType == TransferSyntaxType.RLE)
@@ -195,6 +203,7 @@ public class Compressor implements Closeable {
                 frame.compress();
             compressedPixeldata.add(frame);
         }
+
         for (int gg0000 : embeddedOverlays) {
             dataset.setInt(Tag.OverlayBitsAllocated | gg0000, VR.US, 1);
             dataset.setInt(Tag.OverlayBitPosition | gg0000, VR.US, 0);
